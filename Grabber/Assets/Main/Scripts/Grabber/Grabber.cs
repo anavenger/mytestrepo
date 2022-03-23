@@ -44,19 +44,18 @@ namespace TTP.Controllers
         Closed
     }
     
-    public class GrabberMovement : MonoBehaviour
+    public class Grabber : MonoBehaviour
     {
         [SerializeField] private ScoreController scoreController;
-        [SerializeField] private ObjectsDestroyer objectDestroyer;
         [SerializeField] private ObjectRetentionCheck objectRetentionCheck;
         
-        [SerializeField] private JoystickController joystickController;
+        public Joystick joystick;
         [SerializeField] private ButtonController buttonController;
         
         [SerializeField] private STupple x_Ancors;
         [SerializeField] private STupple z_Ancors;
 
-        [SerializeField] private float moveSpeedCoefficient = 0.5f;
+        [SerializeField] private float moveSpeed = 0.5f;
         [SerializeField] private float downSpeed;
         
         private Rigidbody _movingPlatformRigidbody;
@@ -79,16 +78,58 @@ namespace TTP.Controllers
         public GrabberState grabberState = GrabberState.None;
         public ClawState clawState = ClawState.Opened;
 
+
+        #region Variables After Refactor
+
+        public Transform StartTransform { get; private set; }
+        
+        private StateMachine _stateMachine;
+        public IdleState idleState;
+        public StandingState standingState;
+        public MovingState movingState;
+        public GrabbingState grabbingState;
+
+        #endregion
+        
         private void Start()
         {
-            _movingPlatformRigidbody = GetComponent<Rigidbody>();
-            InitGrabberAnchors();
+            Init();
+            _stateMachine = new StateMachine();
+            idleState = new IdleState(this, _stateMachine);
+            movingState = new MovingState(this, _stateMachine);
+            standingState = new StandingState(this, _stateMachine);
+            
             buttonController.OnStartGrabbingAction += Grab;
             buttonController.OnOpenClawAction += OpenClaw;
+            
+            _stateMachine.Initialize(idleState);
+        }
+        
+        private void Update()
+        {
+            _stateMachine.CurrentState.HandleInput();
+            _stateMachine.CurrentState.LogicUpdate();
+        }
+        
+        void FixedUpdate()
+        {
+            _stateMachine.CurrentState.PhysicsUpdate();
+            
+            // Moving();
+            //GrabbingProcess();
+        }
+        
+        
+
+        private void Init()
+        {
+            StartTransform = transform;
+            InitGrabberAnchors();
         }
 
         private void InitGrabberAnchors()
         {
+            _movingPlatformRigidbody = GetComponent<Rigidbody>();
             _openClawAnchorY = InitAnchor(pistonRigidbody, out _pistonConfigurableJoint, out _pistonConnectedAnchor);
             _upAnchorY = InitAnchor(_movingPlatformRigidbody, out _platformConfigurableJoint, out _platformConnectedAnchor);
         }
@@ -99,18 +140,14 @@ namespace TTP.Controllers
             anchor = joint.connectedAnchor;
             return anchor.y;
         }
+
+       
         
-        void FixedUpdate()
-        {
-            Moving();
-            GrabbingProcess();
-        }
-        
-        private void Moving()
+        public void Moving()
         {
             _position = transform.position;
-            float x = Mathf.Clamp(_position.x + joystickController.JoystickInputZ * moveSpeedCoefficient, x_Ancors._left, x_Ancors._right);
-            float z = Mathf.Clamp(_position.z + joystickController.JoystickInputX * moveSpeedCoefficient, z_Ancors._left, z_Ancors._right);
+            float x = Mathf.Clamp(_position.x + joystick.InputZ * moveSpeed, x_Ancors._left, x_Ancors._right);
+            float z = Mathf.Clamp(_position.z + joystick.InputX * moveSpeed, z_Ancors._left, z_Ancors._right);
             
             Vector3 mInput = new Vector3(x, _position.y, z);
             _movingPlatformRigidbody.MovePosition(mInput);
@@ -192,12 +229,6 @@ namespace TTP.Controllers
             _pistonConfigurableJoint.connectedAnchor = new Vector3(_pistonConnectedAnchor.x, closeClawAnchorY, _pistonConnectedAnchor.z);
             clawState = ClawState.Closed;
         }
-
-        private void SetActiveObjectDestroyer(bool flag)
-        {
-            scoreController.gameObject.SetActive(!flag);
-            objectDestroyer.gameObject.SetActive(flag);
-        }
-   
+        
     }
 }
