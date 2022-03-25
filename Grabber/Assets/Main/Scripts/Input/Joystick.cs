@@ -39,6 +39,7 @@ namespace TTP.UserInput
         {
             InputZ = Input.GetAxis("Horizontal") * Time.deltaTime;
             InputX = Input.GetAxis("Vertical") * Time.deltaTime;
+            //Debug.Log($"InputZ = {InputZ} / InputX  = {InputX }");
         }
 
         public void Moving()

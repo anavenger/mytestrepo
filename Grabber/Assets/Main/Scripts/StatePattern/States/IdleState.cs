@@ -6,31 +6,31 @@ using UnityEngine.InputSystem;
 using TTP.UserInput;
 using Joystick = TTP.UserInput.Joystick;
 
-public class IdleState : State
-{
-    private bool hasInput = false;
-
-    public IdleState(Grabber grabber, StateMachine stateMachine)
-        : base(grabber, stateMachine) { }
-
-    public override void Enter()
+    public class IdleState : State
     {
-        base.Enter();
-        _joystick.InputX = _joystick.InputZ = 0f;
-    }
+        private bool isMoving;
 
-    public override void HandleInput()
-    {
-        base.HandleInput();
-        hasInput = _joystick.HasInput;
-    }
-
-    public override void LogicUpdate()
-    {
-        base.LogicUpdate();
-        if (hasInput)
+        public IdleState(Grabber grabber, StateMachine stateMachine)
+            : base(grabber, stateMachine)
         {
-            _stateMachine.ChangeState(_grabber.movingState);
+        }
+
+        public override void Enter()
+        {
+            base.Enter();
+           // _joystick.InputX = _joystick.InputZ = 0f;
+        }
+
+        public override void HandleInput()
+        {
+            base.HandleInput();
+            isMoving = Utils.DetectMoving();
+        }
+
+        public override void LogicUpdate()
+        {
+            base.LogicUpdate();
+            if (isMoving)
+                _stateMachine.ChangeState(_grabber.movingState);
         }
     }
-}

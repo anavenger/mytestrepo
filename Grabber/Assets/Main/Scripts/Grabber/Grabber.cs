@@ -6,7 +6,6 @@ using TTP.Toys;
 using UnityEngine;
 using TTP.Utilities;
 using TTP.UserInput;
-
 using UnityEngine.Serialization;
 
 namespace TTP.Utilities
@@ -95,12 +94,10 @@ namespace TTP.Controllers
         {
             Init();
             _stateMachine = new StateMachine();
-            idleState = new IdleState(this, _stateMachine);
-            movingState = new MovingState(this, _stateMachine);
-            standingState = new StandingState(this, _stateMachine);
+            InitStates(_stateMachine);
             
-            buttonController.OnStartGrabbingAction += Grab;
-            buttonController.OnOpenClawAction += OpenClaw;
+            //buttonController.OnStartGrabbingAction += Grab;
+            //buttonController.OnOpenClawAction += OpenClaw;
             
             _stateMachine.Initialize(idleState);
         }
@@ -141,7 +138,12 @@ namespace TTP.Controllers
             return anchor.y;
         }
 
-       
+        private void InitStates(StateMachine stateMachine)
+        {
+            idleState = new IdleState(this, stateMachine);
+            movingState = new MovingState(this, stateMachine);
+            standingState = new StandingState(this, stateMachine);
+        }
         
         public void Moving()
         {
