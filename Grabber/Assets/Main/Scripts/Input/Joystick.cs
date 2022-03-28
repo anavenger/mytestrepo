@@ -6,46 +6,43 @@ namespace TTP.UserInput
     {
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private Rigidbody joystickRigidbody;
-        private Quaternion rotation;
+        private Quaternion _rotation;
 
-        public float InputZ { get; set; }
-        public float InputX { get; set; }
+        public float InputZ { get; private set; }
+        public float InputX { get; private set; }
 
-        public bool HasInput
-        {
-            get
-            {
-                GetInput();
-                Debug.Log($"InputZ = {InputZ}");
-                Debug.Log($"InputX = {InputX}");
-                if ((InputZ > 0.001f || InputZ < 0.001f) || (InputX > 0.001f || InputX < 0.001f))
-                    return true;
-                
-                return false;
-            }
-        }
-        
         void Start()
         {
-            rotation = transform.rotation;
+            _rotation = transform.rotation;
+        }
+     
+        public void Move()
+        {
+            GetInput();
+            RotateByInput();
         }
 
-        // private void FixedUpdate()
-        // {
-        //     Moving();
-        // }
+        public void MoveToIdle()
+        {
+            ResetInput();
+            RotateByInput();
+        }
 
-        public void GetInput()
+        private void ResetInput()
+        {
+            InputX = InputZ = 0f;
+        }
+
+        private void GetInput()
         {
             InputZ = Input.GetAxis("Horizontal") * Time.deltaTime;
             InputX = Input.GetAxis("Vertical") * Time.deltaTime;
-            //Debug.Log($"InputZ = {InputZ} / InputX  = {InputX }");
         }
 
-        public void Moving()
+        private void RotateByInput()
         {
-            var mInput = new Quaternion(InputX * moveSpeed, rotation.y, -InputZ * moveSpeed, rotation.w);
-            joystickRigidbody.MoveRotation(mInput.normalized);
+            var rotation = new Quaternion(InputX * moveSpeed, _rotation.y, -InputZ * moveSpeed, _rotation.w);
+            joystickRigidbody.MoveRotation(rotation.normalized);
         }
     }
 }

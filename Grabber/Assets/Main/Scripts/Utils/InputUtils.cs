@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public static class Utils
+public static class InputUtils
 {
     public static bool DetectMoving()
     {
@@ -10,5 +10,10 @@ public static class Utils
                   || Input.GetKey(KeyCode.W) 
                   || Input.GetKey(KeyCode.D) 
                   || Input.GetKey(KeyCode.S);
+    }
+
+    public static bool DetectButtonClick()
+    {
+        return Input.GetKeyDown(KeyCode.Space);
     }
 }

@@ -7,6 +7,7 @@ using UnityEngine;
 using TTP.Utilities;
 using TTP.UserInput;
 using UnityEngine.Serialization;
+using TTP.State;
 
 namespace TTP.Utilities
 { 
@@ -45,35 +46,34 @@ namespace TTP.Controllers
     
     public class Grabber : MonoBehaviour
     {
-        [SerializeField] private ScoreController scoreController;
-        [SerializeField] private ObjectRetentionCheck objectRetentionCheck;
+        [SerializeField] private ScoreController scoreController; //убрать отсюда
+        [SerializeField] private ObjectRetentionCheck objectRetentionCheck;// будет не нужно
         
-        public Joystick joystick;
-        [SerializeField] private ButtonController buttonController;
+        public Joystick joystick;// скорее всего граберу не нужно знать о джойстике (джойстик нужен на этапе движения), то же самое кнопка - она нужна только 
+        public Button button;
         
         [SerializeField] private STupple x_Ancors;
         [SerializeField] private STupple z_Ancors;
 
-        [SerializeField] private float moveSpeed = 0.5f;
-        [SerializeField] private float downSpeed;
-        
-        private Rigidbody _movingPlatformRigidbody;
-        [SerializeField] private Rigidbody pistonRigidbody;
-
-        [Header("Piston Anchor")]
-        [SerializeField] private float closeClawAnchorY = 0.35f;
+        [SerializeField] private float moveSpeed = 20f;
+        [SerializeField] private float downSpeed = 0.03f;
+                
+        [Header("Hand Piston")]
+        [SerializeField] private Rigidbody pistonRB;
+        [SerializeField] private float closedClawAnchorY = 0.35f;
+        private float _openedClawAnchorY;
         private Vector3 _pistonConnectedAnchor;
-        private float _openClawAnchorY;
         private ConfigurableJoint _pistonConfigurableJoint;
 
-        [Header("MovingPlatform Anchor")]
-        [SerializeField] private float downAnchorY = 8.5f;
-        private Vector3 _platformConnectedAnchor;
+        [Header("Moving Platform")]
+        [SerializeField] private float downAnchorLimit = 8.5f;
+        private Rigidbody _platformRB;
         private float _upAnchorY;
+        private Vector3 _platformConnectedAnchor;
         private ConfigurableJoint _platformConfigurableJoint;
-
         private Vector3 _position;
-        
+
+
         public GrabberState grabberState = GrabberState.None;
         public ClawState clawState = ClawState.Opened;
 
@@ -126,9 +126,9 @@ namespace TTP.Controllers
 
         private void InitGrabberAnchors()
         {
-            _movingPlatformRigidbody = GetComponent<Rigidbody>();
-            _openClawAnchorY = InitAnchor(pistonRigidbody, out _pistonConfigurableJoint, out _pistonConnectedAnchor);
-            _upAnchorY = InitAnchor(_movingPlatformRigidbody, out _platformConfigurableJoint, out _platformConnectedAnchor);
+            _platformRB = GetComponent<Rigidbody>();
+            _openedClawAnchorY = InitAnchor(pistonRB, out _pistonConfigurableJoint, out _pistonConnectedAnchor);
+            _upAnchorY = InitAnchor(_platformRB, out _platformConfigurableJoint, out _platformConnectedAnchor);
         }
 
         private float InitAnchor(Rigidbody rb, out ConfigurableJoint joint, out Vector3 anchor)
@@ -143,18 +143,60 @@ namespace TTP.Controllers
             idleState = new IdleState(this, stateMachine);
             movingState = new MovingState(this, stateMachine);
             standingState = new StandingState(this, stateMachine);
+            grabbingState = new GrabbingState(this, stateMachine);
         }
         
-        public void Moving()
+        public void Move()
         {
             _position = transform.position;
             float x = Mathf.Clamp(_position.x + joystick.InputZ * moveSpeed, x_Ancors._left, x_Ancors._right);
             float z = Mathf.Clamp(_position.z + joystick.InputX * moveSpeed, z_Ancors._left, z_Ancors._right);
             
             Vector3 mInput = new Vector3(x, _position.y, z);
-            _movingPlatformRigidbody.MovePosition(mInput);
+            _platformRB.MovePosition(mInput);
         }
         
+        public bool GoDown()
+        {
+            bool downCompleted = true;
+
+            if (_platformConnectedAnchor.y < downAnchorLimit)
+            {
+                _platformConfigurableJoint.connectedAnchor = Vector3.Lerp(
+                        new Vector3(_pistonConnectedAnchor.x, _platformConnectedAnchor.y + downSpeed, _platformConnectedAnchor.z),
+                        new Vector3(_platformConnectedAnchor.x, downAnchorLimit, _platformConnectedAnchor.z),
+                        downSpeed * Time.fixedDeltaTime);
+
+                _platformConnectedAnchor = _platformConfigurableJoint.connectedAnchor;
+                downCompleted = false;
+            }
+            return downCompleted;
+        }
+
+        public void CloseClaw()
+        {
+            _pistonConfigurableJoint.connectedAnchor = new Vector3(_pistonConnectedAnchor.x, closedClawAnchorY, _pistonConnectedAnchor.z);
+        }
+
+        public void GoUp()
+        {
+            if (_platformConnectedAnchor.y > _upAnchorY)
+            {
+                _platformConfigurableJoint.connectedAnchor = Vector3.Lerp(new Vector3(_pistonConnectedAnchor.x, _platformConnectedAnchor.y - downSpeed, _platformConnectedAnchor.z),
+                    new Vector3(_platformConnectedAnchor.x, _upAnchorY, _platformConnectedAnchor.z),
+                    downSpeed * Time.fixedDeltaTime);
+
+                _platformConnectedAnchor = _platformConfigurableJoint.connectedAnchor;
+            }
+        }
+
+        public void OpenClaw()
+        {
+            _pistonConfigurableJoint.connectedAnchor = new Vector3(_pistonConnectedAnchor.x, _openedClawAnchorY, _pistonConnectedAnchor.z);
+        }
+
+
+
         private void Grab()
         {
             if (grabberState == GrabberState.None && clawState == ClawState.Opened)
@@ -168,25 +210,16 @@ namespace TTP.Controllers
             }
         }
 
-        private void OpenClaw()
-        {
-            if (grabberState == GrabberState.EndGrabbing && clawState == ClawState.Closed)
-            {
-                _pistonConfigurableJoint.connectedAnchor = new Vector3(_pistonConnectedAnchor.x, _openClawAnchorY, _pistonConnectedAnchor.z);
-                
-                grabberState = GrabberState.None;
-                clawState = ClawState.Opened;
-            }
-        }
+        
 
         private void GrabbingProcess()
         {
             if (grabberState == GrabberState.StartGrabbing)
             {
-                if (_platformConnectedAnchor.y < downAnchorY && clawState == ClawState.Opened)
+                if (_platformConnectedAnchor.y < downAnchorLimit && clawState == ClawState.Opened)
                 {
                     _platformConfigurableJoint.connectedAnchor = Vector3.Lerp(new Vector3(_pistonConnectedAnchor.x,_platformConnectedAnchor.y + downSpeed ,_platformConnectedAnchor.z),
-                        new Vector3(_platformConnectedAnchor.x, downAnchorY, _platformConnectedAnchor.z),
+                        new Vector3(_platformConnectedAnchor.x, downAnchorLimit, _platformConnectedAnchor.z),
                         downSpeed * Time.deltaTime);
                     
                     _platformConnectedAnchor = _platformConfigurableJoint.connectedAnchor;
@@ -226,11 +259,9 @@ namespace TTP.Controllers
             }
         }
 
-        private void CloseClaw()
-        {
-            _pistonConfigurableJoint.connectedAnchor = new Vector3(_pistonConnectedAnchor.x, closeClawAnchorY, _pistonConnectedAnchor.z);
-            clawState = ClawState.Closed;
-        }
+
+
+        
         
     }
 }

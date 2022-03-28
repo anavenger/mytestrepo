@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using TTP.UserInput;
 using Joystick = TTP.UserInput.Joystick;
+using TTP.State;
 
     public class IdleState : State
     {
@@ -18,13 +19,12 @@ using Joystick = TTP.UserInput.Joystick;
         public override void Enter()
         {
             base.Enter();
-           // _joystick.InputX = _joystick.InputZ = 0f;
         }
 
         public override void HandleInput()
         {
             base.HandleInput();
-            isMoving = Utils.DetectMoving();
+            isMoving = InputUtils.DetectMoving();
         }
 
         public override void LogicUpdate()

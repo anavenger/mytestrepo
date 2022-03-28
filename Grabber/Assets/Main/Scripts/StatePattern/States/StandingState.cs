@@ -2,10 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using TTP.Controllers;
 using UnityEngine;
-
+using TTP.State;
 public class StandingState : State
     {
         private bool isMoving;
+        private bool buttonClicked;
 
         public StandingState(Grabber grabber, StateMachine stateMachine)
             : base(grabber, stateMachine)
@@ -15,21 +16,26 @@ public class StandingState : State
         public override void Enter()
         {
             base.Enter();
-            _joystick.InputX = _joystick.InputZ = 0f;
-            _joystick.Moving();
         }
 
         public override void HandleInput()
         {
             base.HandleInput();
-            isMoving = Utils.DetectMoving();
+            isMoving = InputUtils.DetectMoving();
+            buttonClicked = InputUtils.DetectButtonClick();
         }
 
         public override void LogicUpdate()
         {
             base.LogicUpdate();
             if (isMoving)
+            {
                 _stateMachine.ChangeState(_grabber.movingState);
+            }             
+            else if (buttonClicked)
+            {
+                _stateMachine.ChangeState(_grabber.grabbingState);
+            }
         }
     }
 

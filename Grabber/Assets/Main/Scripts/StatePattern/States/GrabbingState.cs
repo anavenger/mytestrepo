@@ -1,18 +1,41 @@
 using System.Collections;
 using System.Collections.Generic;
+using TTP.Controllers;
 using UnityEngine;
-
-public class GrabbingState : MonoBehaviour
+using TTP.State;
+public class GrabbingState : State
 {
-    // Start is called before the first frame update
-    void Start()
+    bool isDown = false;
+    public GrabbingState(Grabber grabber, StateMachine stateMachine) 
+        : base(grabber, stateMachine)
     {
-        
     }
 
-    // Update is called once per frame
-    void Update()
+    public override void Enter()
     {
-        
+        base.Enter();
     }
+
+    public override void LogicUpdate()
+    {
+
+    }
+
+    public override void PhysicsUpdate()
+    {
+        isDown = _grabber.GoDown();
+        
+        if (isDown)
+        {
+            _grabber.CloseClaw();
+        }
+
+        _grabber.GoUp();
+    }
+
+    public override void Exit()
+    {
+
+    }
+
 }
