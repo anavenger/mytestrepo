@@ -12,12 +12,7 @@ public class StandingState : State
             : base(grabber, stateMachine)
         {
         }
-
-        public override void Enter()
-        {
-            base.Enter();
-        }
-
+        
         public override void HandleInput()
         {
             base.HandleInput();
@@ -30,11 +25,11 @@ public class StandingState : State
             base.LogicUpdate();
             if (isMoving)
             {
-                _stateMachine.ChangeState(_grabber.movingState);
+                _stateMachine.ChangeState(_grabber.MovingState);
             }             
             else if (buttonClicked)
             {
-                _stateMachine.ChangeState(_grabber.grabbingState);
+                _stateMachine.ChangeState(_grabber.GoingDownState);
             }
         }
     }

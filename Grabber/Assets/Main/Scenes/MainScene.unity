@@ -1812,7 +1812,7 @@ MonoBehaviour:
   scoreController: {fileID: 6797556}
   objectRetentionCheck: {fileID: 973741763}
   joystick: {fileID: 2073185856}
-  buttonController: {fileID: 790802589}
+  button: {fileID: 790802589}
   x_Ancors:
     _left: -2.8
     _right: 3
@@ -1821,12 +1821,11 @@ MonoBehaviour:
     _right: 7
   moveSpeed: 20
   downSpeed: 0.03
-  pistonRigidbody: {fileID: 973741761}
-  closeClawAnchorY: 0.28
-  downAnchorY: 8.7
+  pistonRB: {fileID: 973741761}
+  closedClawAnchorY: 0.35
+  downAnchorLimit: 8.5
   grabberState: 0
   clawState: 0
-  grabbingState: {fileID: 0}
 --- !u!65 &962271694
 BoxCollider:
   m_ObjectHideFlags: 0

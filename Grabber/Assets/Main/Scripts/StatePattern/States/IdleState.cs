@@ -31,6 +31,11 @@ using TTP.State;
         {
             base.LogicUpdate();
             if (isMoving)
-                _stateMachine.ChangeState(_grabber.movingState);
+                _stateMachine.ChangeState(_grabber.MovingState);
+            // else
+            // {
+            //    //test
+            //    _stateMachine.ChangeState(_grabber.GoingBackState);
+            // }
         }
     }

@@ -31,25 +31,12 @@ namespace TTP.Utilities
 }
 namespace TTP.Controllers
 {
-    public enum GrabberState
-    {
-        None,
-        StartGrabbing,
-        EndGrabbing
-    }
-
-    public enum ClawState
-    {
-        Opened,
-        Closed
-    }
-    
     public class Grabber : MonoBehaviour
     {
-        [SerializeField] private ScoreController scoreController; //убрать отсюда
-        [SerializeField] private ObjectRetentionCheck objectRetentionCheck;// будет не нужно
+        [SerializeField] private ScoreController scoreController; 
+        [SerializeField] private ObjectRetentionCheck objectRetentionCheck;
         
-        public Joystick joystick;// скорее всего граберу не нужно знать о джойстике (джойстик нужен на этапе движения), то же самое кнопка - она нужна только 
+        public Joystick joystick; 
         public Button button;
         
         [SerializeField] private STupple x_Ancors;
@@ -57,6 +44,7 @@ namespace TTP.Controllers
 
         [SerializeField] private float moveSpeed = 20f;
         [SerializeField] private float downSpeed = 0.03f;
+        [SerializeField] private float moveBackSpeed = 0.03f;
                 
         [Header("Hand Piston")]
         [SerializeField] private Rigidbody pistonRB;
@@ -73,33 +61,25 @@ namespace TTP.Controllers
         private ConfigurableJoint _platformConfigurableJoint;
         private Vector3 _position;
 
-
-        public GrabberState grabberState = GrabberState.None;
-        public ClawState clawState = ClawState.Opened;
-
-
         #region Variables After Refactor
 
         public Transform StartTransform { get; private set; }
         
         private StateMachine _stateMachine;
-        public IdleState idleState;
-        public StandingState standingState;
-        public MovingState movingState;
-        public GrabbingState grabbingState;
+        
+        public IdleState IdleState;
+        public StandingState StandingState;
+        public MovingState MovingState;
+        public GoingDownState GoingDownState;
+        public GoingUpState GoingUpState;
+        public GrabbingState GrabbingState;
+        public GoingBackState GoingBackState;
 
         #endregion
         
         private void Start()
         {
             Init();
-            _stateMachine = new StateMachine();
-            InitStates(_stateMachine);
-            
-            //buttonController.OnStartGrabbingAction += Grab;
-            //buttonController.OnOpenClawAction += OpenClaw;
-            
-            _stateMachine.Initialize(idleState);
         }
         
         private void Update()
@@ -108,22 +88,32 @@ namespace TTP.Controllers
             _stateMachine.CurrentState.LogicUpdate();
         }
         
-        void FixedUpdate()
+        private void FixedUpdate()
         {
             _stateMachine.CurrentState.PhysicsUpdate();
-            
-            // Moving();
-            //GrabbingProcess();
         }
         
-        
-
         private void Init()
         {
             StartTransform = transform;
+            _stateMachine = new StateMachine();
+            
             InitGrabberAnchors();
+            InitStates(_stateMachine);
+            _stateMachine.Initialize(IdleState);
         }
 
+        private void InitStates(StateMachine stateMachine)
+        {
+            IdleState = new IdleState(this, stateMachine);
+            MovingState = new MovingState(this, stateMachine);
+            StandingState = new StandingState(this, stateMachine);
+            GoingDownState = new GoingDownState(this, stateMachine);
+            GrabbingState = new GrabbingState(this, stateMachine);
+            GoingUpState = new GoingUpState(this, stateMachine);
+            GoingBackState = new GoingBackState(this, stateMachine);
+        }
+        
         private void InitGrabberAnchors()
         {
             _platformRB = GetComponent<Rigidbody>();
@@ -137,14 +127,6 @@ namespace TTP.Controllers
             anchor = joint.connectedAnchor;
             return anchor.y;
         }
-
-        private void InitStates(StateMachine stateMachine)
-        {
-            idleState = new IdleState(this, stateMachine);
-            movingState = new MovingState(this, stateMachine);
-            standingState = new StandingState(this, stateMachine);
-            grabbingState = new GrabbingState(this, stateMachine);
-        }
         
         public void Move()
         {
@@ -155,6 +137,28 @@ namespace TTP.Controllers
             Vector3 mInput = new Vector3(x, _position.y, z);
             _platformRB.MovePosition(mInput);
         }
+
+        public void MoveBack()
+        {
+            _position = transform.position;
+            Vector3 moveVector = new Vector3();
+            if (_position.x > x_Ancors._left)
+            {
+                moveVector = Vector3.Lerp(
+                    new Vector3(_position.x - moveBackSpeed, _position.y, _position.z),
+                    new Vector3(x_Ancors._left, _position.y, _position.z),
+                    moveBackSpeed * Time.fixedDeltaTime);
+                _platformRB.MovePosition(moveVector);
+            }
+            if (_position.z < z_Ancors._right)
+            {
+                moveVector = Vector3.Lerp(
+                    new Vector3(_position.x, _position.y, _position.z + moveBackSpeed),
+                    new Vector3(_position.x, _position.y, z_Ancors._right),
+                    moveBackSpeed * Time.fixedDeltaTime);
+                _platformRB.MovePosition(moveVector);
+            }
+        }
         
         public bool GoDown()
         {
@@ -163,105 +167,41 @@ namespace TTP.Controllers
             if (_platformConnectedAnchor.y < downAnchorLimit)
             {
                 _platformConfigurableJoint.connectedAnchor = Vector3.Lerp(
-                        new Vector3(_pistonConnectedAnchor.x, _platformConnectedAnchor.y + downSpeed, _platformConnectedAnchor.z),
-                        new Vector3(_platformConnectedAnchor.x, downAnchorLimit, _platformConnectedAnchor.z),
-                        downSpeed * Time.fixedDeltaTime);
+                    new Vector3(_pistonConnectedAnchor.x, _platformConnectedAnchor.y + downSpeed, _platformConnectedAnchor.z),
+                    new Vector3(_platformConnectedAnchor.x, downAnchorLimit, _platformConnectedAnchor.z),
+                    downSpeed * Time.fixedDeltaTime);
 
                 _platformConnectedAnchor = _platformConfigurableJoint.connectedAnchor;
                 downCompleted = false;
             }
             return downCompleted;
         }
-
-        public void CloseClaw()
+        
+        public bool GoUp()
         {
-            _pistonConfigurableJoint.connectedAnchor = new Vector3(_pistonConnectedAnchor.x, closedClawAnchorY, _pistonConnectedAnchor.z);
-        }
-
-        public void GoUp()
-        {
+            bool upCompleted = true;
+            
             if (_platformConnectedAnchor.y > _upAnchorY)
             {
-                _platformConfigurableJoint.connectedAnchor = Vector3.Lerp(new Vector3(_pistonConnectedAnchor.x, _platformConnectedAnchor.y - downSpeed, _platformConnectedAnchor.z),
+                _platformConfigurableJoint.connectedAnchor = Vector3.Lerp(
+                    new Vector3(_pistonConnectedAnchor.x, _platformConnectedAnchor.y - downSpeed, _platformConnectedAnchor.z),
                     new Vector3(_platformConnectedAnchor.x, _upAnchorY, _platformConnectedAnchor.z),
                     downSpeed * Time.fixedDeltaTime);
 
                 _platformConnectedAnchor = _platformConfigurableJoint.connectedAnchor;
+                upCompleted = false;
             }
+            return upCompleted;
         }
-
+        
+        public void CloseClaw()
+        {
+            _pistonConfigurableJoint.connectedAnchor = new Vector3(_pistonConnectedAnchor.x, closedClawAnchorY, _pistonConnectedAnchor.z);
+        }
+        
         public void OpenClaw()
         {
             _pistonConfigurableJoint.connectedAnchor = new Vector3(_pistonConnectedAnchor.x, _openedClawAnchorY, _pistonConnectedAnchor.z);
         }
-
-
-
-        private void Grab()
-        {
-            if (grabberState == GrabberState.None && clawState == ClawState.Opened)
-            {
-                grabberState = GrabberState.StartGrabbing;
-                //SetActiveObjectDestroyer(true);
-            }
-            else if (grabberState == GrabberState.StartGrabbing)
-            {
-                CloseClaw();
-            }
-        }
-
-        
-
-        private void GrabbingProcess()
-        {
-            if (grabberState == GrabberState.StartGrabbing)
-            {
-                if (_platformConnectedAnchor.y < downAnchorLimit && clawState == ClawState.Opened)
-                {
-                    _platformConfigurableJoint.connectedAnchor = Vector3.Lerp(new Vector3(_pistonConnectedAnchor.x,_platformConnectedAnchor.y + downSpeed ,_platformConnectedAnchor.z),
-                        new Vector3(_platformConnectedAnchor.x, downAnchorLimit, _platformConnectedAnchor.z),
-                        downSpeed * Time.deltaTime);
-                    
-                    _platformConnectedAnchor = _platformConfigurableJoint.connectedAnchor;
-                }
-                else
-                {
-                    CloseClaw();
-                }
-
-                if (clawState == ClawState.Closed && grabberState != GrabberState.EndGrabbing)
-                {
-                    if (_platformConnectedAnchor.y > _upAnchorY)
-                    {
-                        _platformConfigurableJoint.connectedAnchor = Vector3.Lerp(new Vector3(_pistonConnectedAnchor.x,_platformConnectedAnchor.y - downSpeed ,_platformConnectedAnchor.z),
-                            new Vector3(_platformConnectedAnchor.x, _upAnchorY, _platformConnectedAnchor.z),
-                            downSpeed * Time.deltaTime);
-                        
-                        _platformConnectedAnchor = _platformConfigurableJoint.connectedAnchor;
-                    }
-                    else
-                    {
-                        grabberState = GrabberState.EndGrabbing;
-                       //SetActiveObjectDestroyer(false);
-                        if (!objectRetentionCheck.CheckRetention())
-                        {
-                            OpenClaw();
-                        }
-                    }
-                }
-            }
-            else if(grabberState == GrabberState.EndGrabbing)
-            {
-                if (!objectRetentionCheck.CheckRetention())
-                {
-                    OpenClaw();
-                }
-            }
-        }
-
-
-
-        
-        
     }
 }

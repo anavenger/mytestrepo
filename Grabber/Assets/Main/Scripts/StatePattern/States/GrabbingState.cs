@@ -1,41 +1,22 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using TTP.Controllers;
 using UnityEngine;
 using TTP.State;
 public class GrabbingState : State
 {
-    bool isDown = false;
+    private float delay = 2f;
+    private float currentTime = 0f;
+    
     public GrabbingState(Grabber grabber, StateMachine stateMachine) 
         : base(grabber, stateMachine)
     {
     }
 
-    public override void Enter()
-    {
-        base.Enter();
-    }
-
-    public override void LogicUpdate()
-    {
-
-    }
-
     public override void PhysicsUpdate()
     {
-        isDown = _grabber.GoDown();
-        
-        if (isDown)
-        {
-            _grabber.CloseClaw();
-        }
-
-        _grabber.GoUp();
+        _grabber.CloseClaw();
+        _stateMachine.ChangeState(_grabber.GoingUpState);
     }
-
-    public override void Exit()
-    {
-
-    }
-
 }
