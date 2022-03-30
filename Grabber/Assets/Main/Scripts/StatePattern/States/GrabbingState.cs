@@ -16,6 +16,7 @@ public class GrabbingState : State
 
     public override void PhysicsUpdate()
     {
+        base.PhysicsUpdate();
         _grabber.CloseClaw();
         _stateMachine.ChangeState(_grabber.GoingUpState);
     }

@@ -18,8 +18,6 @@ public class GoingUpState : State
         _isUp = _grabber.GoUp();
         
         if (_isUp)
-        {
             _stateMachine.ChangeState(_grabber.GoingBackState);
-        }
     }
 }

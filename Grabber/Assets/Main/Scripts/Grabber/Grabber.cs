@@ -9,26 +9,6 @@ using TTP.UserInput;
 using UnityEngine.Serialization;
 using TTP.State;
 
-namespace TTP.Utilities
-{ 
-[System.Serializable]
-    public struct STupple
-    {
-        public float _left;
-
-        public float _right;
-        private STupple((float left, float right) pair)
-        {
-            _left = pair.left;
-            _right = pair.right;
-        }
-
-        public static implicit operator STupple((float left, float right) pair)
-        {
-            return new STupple(pair);
-        }
-    }
-}
 namespace TTP.Controllers
 {
     public class Grabber : MonoBehaviour
@@ -38,9 +18,9 @@ namespace TTP.Controllers
         
         public Joystick joystick; 
         public Button button;
-        
-        [SerializeField] private STupple x_Ancors;
-        [SerializeField] private STupple z_Ancors;
+
+        [SerializeField] private Tupple<float> anchorsX;
+        [SerializeField] private Tupple<float> anchorsZ;
 
         [SerializeField] private float moveSpeed = 20f;
         [SerializeField] private float downSpeed = 0.03f;
@@ -74,6 +54,7 @@ namespace TTP.Controllers
         public GoingUpState GoingUpState;
         public GrabbingState GrabbingState;
         public GoingBackState GoingBackState;
+        public OpeningClawState OpeningClawState;
 
         #endregion
         
@@ -95,7 +76,6 @@ namespace TTP.Controllers
         
         private void Init()
         {
-            StartTransform = transform;
             _stateMachine = new StateMachine();
             
             InitGrabberAnchors();
@@ -112,6 +92,7 @@ namespace TTP.Controllers
             GrabbingState = new GrabbingState(this, stateMachine);
             GoingUpState = new GoingUpState(this, stateMachine);
             GoingBackState = new GoingBackState(this, stateMachine);
+            OpeningClawState = new OpeningClawState(this, stateMachine);
         }
         
         private void InitGrabberAnchors()
@@ -131,33 +112,53 @@ namespace TTP.Controllers
         public void Move()
         {
             _position = transform.position;
-            float x = Mathf.Clamp(_position.x + joystick.InputZ * moveSpeed, x_Ancors._left, x_Ancors._right);
-            float z = Mathf.Clamp(_position.z + joystick.InputX * moveSpeed, z_Ancors._left, z_Ancors._right);
+            float x = Mathf.Clamp(_position.x + joystick.InputZ * moveSpeed, anchorsX.min, anchorsX.max);
+            float z = Mathf.Clamp(_position.z + joystick.InputX * moveSpeed, anchorsZ.min, anchorsZ.max);
             
             Vector3 mInput = new Vector3(x, _position.y, z);
             _platformRB.MovePosition(mInput);
         }
 
-        public void MoveBack()
+        // public void MoveBack()
+        // {
+        //     _position = transform.position;
+        //     Vector3 moveVector = new Vector3();
+        //     if (_position.x > x_Ancors.min)
+        //     {
+        //         moveVector = Vector3.Lerp(
+        //             new Vector3(_position.x - moveBackSpeed, _position.y, _position.z),
+        //             new Vector3(x_Ancors.min, _position.y, _position.z),
+        //             moveBackSpeed * Time.fixedDeltaTime);
+        //         _platformRB.MovePosition(moveVector);
+        //     }
+        //     if (_position.z > z_Ancors.min)
+        //     {
+        //         moveVector = Vector3.Lerp(
+        //             new Vector3(_position.x, _position.y, _position.z - moveBackSpeed),
+        //              new Vector3(_position.x, _position.y, z_Ancors.min),
+        //             moveBackSpeed * Time.fixedDeltaTime);
+        //         _platformRB.MovePosition(moveVector);
+        //     }
+        // }
+
+        private bool _isBackToX;
+        private bool _isBackToZ;
+        
+        public bool MoveBack()
         {
             _position = transform.position;
-            Vector3 moveVector = new Vector3();
-            if (_position.x > x_Ancors._left)
-            {
-                moveVector = Vector3.Lerp(
-                    new Vector3(_position.x - moveBackSpeed, _position.y, _position.z),
-                    new Vector3(x_Ancors._left, _position.y, _position.z),
-                    moveBackSpeed * Time.fixedDeltaTime);
-                _platformRB.MovePosition(moveVector);
-            }
-            if (_position.z < z_Ancors._right)
-            {
-                moveVector = Vector3.Lerp(
-                    new Vector3(_position.x, _position.y, _position.z + moveBackSpeed),
-                    new Vector3(_position.x, _position.y, z_Ancors._right),
-                    moveBackSpeed * Time.fixedDeltaTime);
-                _platformRB.MovePosition(moveVector);
-            }
+            
+            if (!_isBackToX)
+                _isBackToX = MoveBack(true, anchorsX.min);
+            if (!_isBackToZ)
+                _isBackToZ = MoveBack(false, anchorsZ.min);
+            
+            return _isBackToX && _isBackToZ;
+        }
+
+        public void ResetBackMove()
+        {
+            _isBackToX = _isBackToZ = false;
         }
         
         public bool GoDown()
@@ -196,12 +197,44 @@ namespace TTP.Controllers
         
         public void CloseClaw()
         {
-            _pistonConfigurableJoint.connectedAnchor = new Vector3(_pistonConnectedAnchor.x, closedClawAnchorY, _pistonConnectedAnchor.z);
+            SetPistonAnchor(closedClawAnchorY);
         }
         
         public void OpenClaw()
         {
-            _pistonConfigurableJoint.connectedAnchor = new Vector3(_pistonConnectedAnchor.x, _openedClawAnchorY, _pistonConnectedAnchor.z);
+            SetPistonAnchor(_openedClawAnchorY);
+        }
+        
+        private bool MoveBack(bool movingToX, float minPosition)
+        {
+            bool moveBackCompleted;
+            
+            var posX1 = (movingToX) ? _position.x - moveBackSpeed : _position.x;
+            var posZ1 = (!movingToX) ? _position.z - moveBackSpeed : _position.z;
+            
+            var posX2 = (movingToX) ? minPosition: _position.x;
+            var posZ2 = (!movingToX) ? minPosition : _position.z;
+
+            var comparePosition = (movingToX) ? _position.x : _position.z;
+            
+            if (comparePosition > minPosition)
+            {
+                var newPosition = Vector3.Lerp(
+                    new Vector3(posX1, _position.y, posZ1),
+                    new Vector3(posX2, _position.y, posZ2),
+                    moveBackSpeed * Time.fixedDeltaTime);
+                
+                _platformRB.MovePosition(newPosition);
+                return moveBackCompleted = false;
+            }
+
+            comparePosition = minPosition;
+            return moveBackCompleted = true;
+        }
+
+        private void SetPistonAnchor(float valueY)
+        {
+            _pistonConfigurableJoint.connectedAnchor = new Vector3(_pistonConnectedAnchor.x, valueY, _pistonConnectedAnchor.z);
         }
     }
 }
